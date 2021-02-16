@@ -6,6 +6,10 @@ Files :
         * global.py : retrain and predict all
         
         * other-.py : load available model and predict directly
+        
+        * result/y_hat : Non-translated Test Results(float32)
+        
+        * result/test_y : Translated Test Results(0/1)
 
 P.S.It lasks the 
 
