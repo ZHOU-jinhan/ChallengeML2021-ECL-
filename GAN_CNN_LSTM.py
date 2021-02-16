@@ -178,8 +178,11 @@ class myCRGAN:
         """
         self.d_threshold=np.load(r"results/models/CRGAN/threshold.npy")
         self.discriminator = load_model(os.path.join('results','models','CRGAN', 'discriminator.h5'))
-        self.combined = load_model(os.path.join('results','models','CRGAN', 'combined_model.h5'))
-        self.generator = load_model(os.path.join('results','models','CRGAN', 'generator.h5'))
+        try:
+            self.combined = load_model(os.path.join('results','models','CRGAN', 'combined_model.h5'))
+            self.generator = load_model(os.path.join('results','models','CRGAN', 'generator.h5'))
+        except:
+            pass
         self.discriminator.summary()
 
     def predict(self,path_x='X_test.h5'):
