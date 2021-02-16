@@ -7,6 +7,8 @@ Available Files :
         
         * other-.py : load available model and predict directly
         
+        * file_translator.py : correct all labels of result/y_hat and result/test_y
+        
         * y_train.csv : train sample (Y)
         
         * result/models : Models' parameters (NN Parameters & Thresholds)
