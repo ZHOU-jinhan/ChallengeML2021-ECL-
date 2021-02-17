@@ -3,9 +3,9 @@ GroupeC ECL-ML 2021
 
 Methods :
 
-       * Machine Learning : Linear_Model/IMS
+       * Machine Learning : LinearModel/IMS
 
-       * Deep Learning(NN) : LSTM/CNN/CRNN/Attention_CRNN/CRGAN
+       * Deep Learning(NN) : LSTM/CNN/CRNN/AttentionCRNN/CRGAN
 
 Available Files :
 
