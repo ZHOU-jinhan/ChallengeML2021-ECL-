@@ -1,6 +1,12 @@
 # ChallengeML2021-ECL-
 GroupeC ECL-ML 2021
 
+Methods :
+
+       * Machine Learning : Linear_Model/IMS
+
+       * Deep Learning(NN) : LSTM/CNN/CRNN/Attention_CRNN/CRGAN
+
 Available Files :
 
         * global.py : retrain and predict all
