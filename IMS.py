@@ -9,7 +9,7 @@ class uniIMS:
     def __init__(self):
         # IMS参数
         # 簇外的点是否需要通过调整簇的大小，从而将其纳入簇内的门限
-        self.incorporate_dist_threshold = 0.6
+        self.incorporate_dist_threshold = 0.3
         # 初始簇大小
         self.initial_dist_threshold = 0.1
         # 簇的增长大小，对于某个维度的x_max和次大的x_submax的差的5%增长在x_max上,x_min同理
@@ -35,12 +35,14 @@ class uniIMS:
             submax_border=clusters_submax_border[-1]
             submin_border=clusters_submin_border[-1]
             cal=np.sum((X<=submax_border)*(X>=submin_border),axis=1)
+            print(cal)
             id_=np.where(cal!=submax_border.size)[0]
             if id_.size!=X.shape[0]:
                 id_n=np.where(cal!=submax_border.size)[0]
                 X_n=X[id_n,:];max_border=np.max(X_n,axis=0);min_border=np.min(X_n,axis=0)
-                clusters_max_border[-1]=max_border+(max_border-submax_border)*self.expansion_rate
-                clusters_min_border[-1]=min_border-(submin_border-min_border)*self.expansion_rate
+                print(submax_border-max_border,min_border-submin_border)
+                clusters_max_border[-1]=max_border+(submax_border-max_border)*self.expansion_rate
+                clusters_min_border[-1]=min_border-(min_border-submin_border)*self.expansion_rate
                 clusters_submax_border[-1]=self.expansion_rate*(clusters_max_border[-1]-self.clusters_min_border[-1])
                 clusters_submin_border[-1]=self.expansion_rate*(clusters_max_border[-1]-self.clusters_min_border[-1])
                 X=X[id_,:]
@@ -100,9 +102,9 @@ class myIMS:
             t=time()
             X=X_train[:,i,:]
             test_y.append(self.model[i].validate(X.reshape(X.shape[0],-1)))
-            print("Column "+str(i+1)+"/"+str(l)+" - "+str(round(time()-t,2))+"s")
+            print("\tColumn "+str(i+1)+"/"+str(l)+" - "+str(round(time()-t,2))+"s")
         rmse = np.sqrt(mean_squared_error(Y, np.array(test_y).astype("int32").T))
-        print('Test RMSE: %.3f' % rmse)
+        print('Test RMSE: %.3f\n' % rmse)
         self.save()
 
     def predict(self,path_x='X_test.h5'):
@@ -137,5 +139,5 @@ class myIMS:
 
 if __name__ == "__main__":
     ims = myIMS()
-    ims.load()
+    ims.train()
     ims.predict()
