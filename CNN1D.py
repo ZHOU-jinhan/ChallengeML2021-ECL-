@@ -53,7 +53,7 @@ class myCNN:
             self.model.add(Dense(256))
             self.model.add(Dropout(0.25))
             self.model.add(Dense(90,activation="softmax",kernel_initializer='he_normal'))
-            self.model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=opt[1])
+            self.model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=opt[0])
             self.model.summary()
         # fit network
         if train_split!=1:
@@ -89,7 +89,10 @@ class myCNN:
         if plot:
             pyplot.show()
 
-    def predict(self,path_x='X_train.h5'):
+    def config(self,i=1):
+        self.model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=opt[i])
+
+    def predict(self,path_x='X_test.h5'):
         # load dataset
         h5_file = h5py.File(path_x,"r")
         test_X = (np.array(h5_file["data"][:, 2:])).astype('float32')
@@ -98,14 +101,16 @@ class myCNN:
         test_X = (test_X-self.mean)/self.aplt
         test_X = test_X.reshape([-1,test_X.shape[1]*test_X.shape[2],test_X.shape[3]])
         test_y = self.model.predict(test_X)
-        pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("train/CNN_y.csv")
+##        pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("train/CNN_y.csv")
 ##        pd.DataFrame(test_y).to_csv("results/y_hat/CNN_y_hat.csv")
-##        pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("results/test_y/CNN_y.csv")
+        pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("results/test_y/CNN_y.csv")
 
     def save(self):
         """
         Save trained self.model.
         """
+        np.save("results/models/CNN1D/mean.npy",self.mean)
+        np.save("results/models/CNN1D/aplt.npy",self.aplt)
         np.save("results/models/CNN1D/threshold.npy",self.d_threshold)
         self.model.save('results/models/CNN1D/cnn_.h5')
 
@@ -113,6 +118,8 @@ class myCNN:
         """
         Load self.model for channel.
         """
+        self.mean=np.load("results/models/CNN1D/mean.npy")
+        self.aplt=np.load("results/models/CNN1D/aplt.npy")
         self.d_threshold=np.load("results/models/CNN1D/threshold.npy")
         self.model = load_model('results/models/CNN1D/cnn_.h5')
         self.model.summary()
@@ -120,5 +127,6 @@ class myCNN:
 if __name__=="__main__":
     cnn=myCNN()
     cnn.load()
+    cnn.config()
     cnn.train()
     cnn.predict()

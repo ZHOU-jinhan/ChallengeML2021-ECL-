@@ -7,6 +7,7 @@ from pandas import concat
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_squared_error
+import tensorflow as tf
 from tensorflow.keras.models import Sequential,load_model
 from tensorflow.keras.layers import BatchNormalization,LeakyReLU,Dense,LSTM,Dropout,Conv2D,MaxPooling2D,Reshape
 import h5py
@@ -21,7 +22,10 @@ class myCNN_LSTM:
         # load dataset
         h5_file = h5py.File(path_x,"r");X_data=(np.array(h5_file["data"][:, 2:])).astype('float32')
         X_train = X_data.reshape(X_data.shape[0],8,int(X_data.shape[1]/800),100)
-        X_train = X_train.transpose(0,2,1,3)
+        X_train = X_train.transpose(0,2,3,1);X=X_train.reshape(-1,8);
+        self.mean = np.mean(X,axis=0);self.aplt = np.max(X,axis=0)-np.min(X,axis=0)
+        X_train = (X_train-self.mean)/self.aplt
+        X_train = X_train.transpose(0,1,3,2)
         Y_train = read_csv(path_y, header=0, index_col=0).values.astype('float32')
         # split into train and test sets
         n_train_hours = int(X_train.shape[0]*train_split)
@@ -34,28 +38,22 @@ class myCNN_LSTM:
         if self.model==None:
             self.model = Sequential()
             # Convolution layer
-            self.model.add(Conv2D(16,[3,3], input_shape=(train_X.shape[-3],train_X.shape[-2], train_X.shape[-1]), padding='same', kernel_initializer='he_normal'))  # (None, ls, 38, 32)
+            self.model.add(Conv2D(64,[3,3], input_shape=(train_X.shape[-3],train_X.shape[-2], train_X.shape[-1]), padding='same', kernel_initializer='he_normal'))  # (None, ls, 38, 32)
             self.model.add(MaxPooling2D([1,2],padding="same"))
             self.model.add(BatchNormalization(momentum=0.8))
-            self.model.add(LeakyReLU(alpha=0.2))
-            self.model.add(Dropout(0.25))
-            self.model.add(Conv2D(32, [2,5], padding='same', kernel_initializer='he_normal'))  # (None, ls, 38, 64)
-            self.model.add(LeakyReLU(alpha=0.2))
-            self.model.add(Dropout(0.25))
-            self.model.add(Conv2D(32, [5,2], padding='same', kernel_initializer='he_normal'))  # (None, ls/2, 19, 64)
-            self.model.add(LeakyReLU(alpha=0.2))
+            self.model.add(Conv2D(32, [3,3], padding='same', kernel_initializer='he_normal'))
+            self.model.add(Conv2D(32, [3,3], padding='same', kernel_initializer='he_normal'))
             self.model.add(Dropout(0.25))
             self.model.add(Reshape(target_shape=((90,-1))))
-            self.model.add(Dense(128))
-            self.model.add(Dropout(0.25))
             self.model.add(Dense(64))
+            self.model.add(Dropout(0.25))
             # CNN to RNN
             self.model.add(LSTM(80, return_sequences=True))
             self.model.add(Dropout(0.3))
-            self.model.add(LSTM(40, return_sequences=True))
+            self.model.add(LSTM(360, return_sequences=False))
             self.model.add(Dropout(0.3))
-            self.model.add(Dense(1,activation="sigmoid"))
-            self.model.compile(loss='mae', optimizer='adam')
+            self.model.add(Dense(90,activation="sigmoid"))
+            self.model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer='adam')
             self.model.summary()
         # fit network
         if train_split!=1:
@@ -64,8 +62,7 @@ class myCNN_LSTM:
             history = self.model.fit(train_X, train_y, epochs=epochs, batch_size=batch_size, validation_data=(train_X, train_y), verbose=2, shuffle=False)
         # plot history
         pyplot.plot(history.history['loss'], label='train')
-        if train_split!=1:
-            pyplot.plot(history.history['val_loss'], label='test')
+        pyplot.plot(history.history['val_loss'], label='test')
         pyplot.legend()
         if train_split==1:
             test_X=train_X;test_y=train_y
@@ -75,14 +72,13 @@ class myCNN_LSTM:
         # invert scaling for forecast
         # invert scaling for actual
         test_y = test_y.reshape(yhat.shape[0],yhat.shape[1])
-        self.d_threshold=[]
-        for i in range(test_y.shape[1]):
-            if len(np.where(test_y[:,i]==1)[0])==0:
-                self.d_threshold.append(1.05*np.max(yhat[np.where(test_y[:,i]==0)[0],i],0))
-            else:
-                self.d_threshold.append(0.5*np.mean(yhat[np.where(test_y[:,i]==1)[0],i],0)+0.5*np.mean(yhat[np.where(test_y[:,i]==0)[0],i],0))
-        self.d_threshold=np.array(self.d_threshold).astype("float32")
-        # calculate RMSE
+        if np.where(test_y==0)[0].size==0:
+            self.d_threshold = np.max(yhat[np.where(test_y==0)])
+        else:
+            err=yhat[np.where(test_y==1)].reshape(-1,);val=yhat[np.where(test_y==0)].reshape(-1,)
+            pyplot.figure();pyplot.scatter(np.zeros(val.size),val);pyplot.scatter(np.ones(err.size),err)
+            self.d_threshold=0.5*np.median(yhat[np.where(test_y==1)])\
+                              +0.5*np.median(yhat[np.where(test_y==0)])
         rmse = sqrt(mean_squared_error(test_y, yhat))
         print('Test RMSE: %.3f' % rmse)
         rmse = sqrt(mean_squared_error(test_y, np.array(yhat>self.d_threshold).astype("int32")))
@@ -91,7 +87,7 @@ class myCNN_LSTM:
         if plot:
             pyplot.show()
 
-    def predict(self,path_x='X_test.h5'):
+    def predict(self,path_x='X_train.h5'):
         # load dataset
         h5_file = h5py.File(path_x,"r")
         test_X = (np.array(h5_file["data"][:, 2:])).astype('float32')
@@ -99,8 +95,9 @@ class myCNN_LSTM:
         test_X = test_X.transpose(0,2,1,3)
         test_y = self.model.predict(test_X)
         test_y = test_y.reshape(test_y.shape[0],test_y.shape[1])
-        pd.DataFrame(test_y).to_csv("results/y_hat/CRNN_y_hat.csv")
-        pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("results/test_y/CRNN_y.csv")
+        pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("train/CRNN_y.csv")
+##        pd.DataFrame(test_y).to_csv("results/y_hat/CRNN_y_hat.csv")
+##        pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("results/test_y/CRNN_y.csv")
 
     def save(self):
         """
@@ -108,16 +105,20 @@ class myCNN_LSTM:
         """
         np.save("results/models/CRNN/threshold.npy",self.d_threshold)
         self.model.save('results/models/CRNN/cnn_lstm_.h5')
+        np.save("results/models/CRNN/mean.npy",self.mean)
+        np.save("results/models/CRNN/aplt.npy",self.aplt)
 
     def load(self):
         """
         Load self.model for channel.
         """
+        self.mean=np.load("results/models/CRNN/mean.npy")
+        self.aplt=np.load("results/models/CRNN/aplt.npy")
         self.d_threshold=np.load("results/models/CRNN/threshold.npy")
         self.model = load_model('results/models/CRNN/cnn_lstm_.h5')
         self.model.summary()
 
 if __name__=="__main__":
     cnn_lstm=myCNN_LSTM()
-    cnn_lstm.load()
+    cnn_lstm.train()
     cnn_lstm.predict()

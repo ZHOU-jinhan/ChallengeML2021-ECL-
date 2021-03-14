@@ -42,7 +42,7 @@ class myLSTM:
         # design network
         if self.model==None:
             self.model = Sequential()
-            self.model.add(Dense(10,input_shape=X_train.shape[1:]))
+            self.model.add(Dense(20,input_shape=X_train.shape[1:]))
             self.model.add(BatchNormalization(momentum=0.5))
             self.model.add(Reshape(target_shape=(8,-1)))
             self.model.add(Permute((2,1)))
@@ -70,15 +70,13 @@ class myLSTM:
         # invert scaling for forecast
         # invert scaling for actual
         test_y = test_y.reshape(yhat.shape[0],yhat.shape[1])
-        self.d_threshold=[]
         if np.where(test_y==0)[0].size==0:
-            self.d_threshold.append(np.max(yhat[np.where(test_y==0)]))
+            self.d_threshold = np.max(yhat[np.where(test_y==0)])
         else:
-            print(np.min(yhat[np.where(test_y==1)]),np.mean(yhat[np.where(test_y==1)]),np.max(yhat[np.where(test_y==1)]),\
-                  np.min(yhat[np.where(test_y==0)]),np.mean(yhat[np.where(test_y==0)]),np.max(yhat[np.where(test_y==0)]))
-            self.d_threshold.append(0.5*np.mean(yhat[np.where(test_y==1)])\
-                                    +0.5*np.mean(yhat[np.where(test_y==0)]))
-        self.d_threshold=np.array(self.d_threshold).astype("float32")
+            err=yhat[np.where(test_y==1)].reshape(-1,);val=yhat[np.where(test_y==0)].reshape(-1,)
+            pyplot.figure();pyplot.scatter(np.zeros(val.size),val);pyplot.scatter(np.ones(err.size),err)
+            self.d_threshold=0.5*np.median(yhat[np.where(test_y==1)])\
+                              +0.5*np.median(yhat[np.where(test_y==0)])
         # calculate RMSE
         rmse = sqrt(mean_squared_error(test_y, yhat))
         print('Test RMSE: %.3f' % rmse)
