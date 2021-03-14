@@ -46,11 +46,10 @@ class myLSTM:
             self.model.add(BatchNormalization(momentum=0.5))
             self.model.add(Reshape(target_shape=(8,-1)))
             self.model.add(Permute((2,1)))
-            self.model.add(LSTM(40, return_sequences=True))
+            self.model.add(LSTM(80, return_sequences=True))
             self.model.add(Dropout(0.25))
-            self.model.add(LSTM(40, return_sequences=False))
-            self.model.add(Dropout(0.25))
-            self.model.add(Dense(90,activation="softmax"))
+            self.model.add(Dense(1,activation="softmax"))
+            self.model.add(Reshape(target_shape=(-1,)))
             self.model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=2e-3))
         # fit network
         if train_split!=1:

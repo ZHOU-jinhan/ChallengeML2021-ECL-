@@ -9,7 +9,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_squared_error
 import tensorflow as tf
 from tensorflow.keras.models import Sequential,load_model
-from tensorflow.keras.layers import BatchNormalization,LeakyReLU,Dense,LSTM,Dropout,Conv2D,MaxPooling2D,Reshape
+from tensorflow.keras.layers import BatchNormalization,LeakyReLU,Dense,LSTM,Dropout,Conv2D,AveragePooling2D,Reshape
 import h5py
 import numpy as np
 import pandas as pd
@@ -25,7 +25,7 @@ class myCNN_LSTM:
         X_train = X_train.transpose(0,2,3,1);X=X_train.reshape(-1,8);
         self.mean = np.mean(X,axis=0);self.aplt = np.max(X,axis=0)-np.min(X,axis=0)
         X_train = (X_train-self.mean)/self.aplt
-        X_train = X_train.transpose(0,1,3,2)
+        X_train = X_train.reshape([X_train.shape[0],X_train.shape[1],-1,1])
         Y_train = read_csv(path_y, header=0, index_col=0).values.astype('float32')
         # split into train and test sets
         n_train_hours = int(X_train.shape[0]*train_split)
@@ -38,21 +38,22 @@ class myCNN_LSTM:
         if self.model==None:
             self.model = Sequential()
             # Convolution layer
-            self.model.add(Conv2D(64,[3,3], input_shape=(train_X.shape[-3],train_X.shape[-2], train_X.shape[-1]), padding='same', kernel_initializer='he_normal'))  # (None, ls, 38, 32)
-            self.model.add(MaxPooling2D([1,2],padding="same"))
+            self.model.add(Conv2D(16,[3,3], input_shape=(train_X.shape[-3],train_X.shape[-2], train_X.shape[-1]), padding='same', kernel_initializer='he_normal'))  # (None, ls, 38, 32)
+            self.model.add(AveragePooling2D([1,5],padding="same"))
             self.model.add(BatchNormalization(momentum=0.8))
             self.model.add(Conv2D(32, [3,3], padding='same', kernel_initializer='he_normal'))
             self.model.add(Conv2D(32, [3,3], padding='same', kernel_initializer='he_normal'))
+            self.model.add(AveragePooling2D([1,5],padding="same"))
             self.model.add(Dropout(0.25))
             self.model.add(Reshape(target_shape=((90,-1))))
-            self.model.add(Dense(64))
             self.model.add(Dropout(0.25))
             # CNN to RNN
-            self.model.add(LSTM(80, return_sequences=True))
+            self.model.add(LSTM(256, return_sequences=True))
             self.model.add(Dropout(0.3))
-            self.model.add(LSTM(360, return_sequences=False))
+            self.model.add(LSTM(64, return_sequences=True))
             self.model.add(Dropout(0.3))
-            self.model.add(Dense(90,activation="sigmoid"))
+            self.model.add(Dense(1,activation="sigmoid"))
+            self.model.add(Reshape(target_shape=(-1,)))
             self.model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer='adam')
             self.model.summary()
         # fit network
@@ -76,7 +77,7 @@ class myCNN_LSTM:
             self.d_threshold = np.max(yhat[np.where(test_y==0)])
         else:
             err=yhat[np.where(test_y==1)].reshape(-1,);val=yhat[np.where(test_y==0)].reshape(-1,)
-            pyplot.figure();pyplot.scatter(np.zeros(val.size),val);pyplot.scatter(np.ones(err.size),err)
+            pyplot.figure();pyplot.scatter(np.zeros(val.size),val,s=0.5);pyplot.scatter(np.ones(err.size),err,s=0.5)
             self.d_threshold=0.5*np.median(yhat[np.where(test_y==1)])\
                               +0.5*np.median(yhat[np.where(test_y==0)])
         rmse = sqrt(mean_squared_error(test_y, yhat))
@@ -92,7 +93,7 @@ class myCNN_LSTM:
         h5_file = h5py.File(path_x,"r")
         test_X = (np.array(h5_file["data"][:, 2:])).astype('float32')
         test_X = test_X.reshape(test_X.shape[0],8,int(test_X.shape[1]/800),100)
-        test_X = test_X.transpose(0,2,1,3)
+        test_X = test_X.reshape([X_train.shape[0],X_train.shape[1],-1,1])
         test_y = self.model.predict(test_X)
         test_y = test_y.reshape(test_y.shape[0],test_y.shape[1])
         pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("train/CRNN_y.csv")
@@ -120,5 +121,6 @@ class myCNN_LSTM:
 
 if __name__=="__main__":
     cnn_lstm=myCNN_LSTM()
+    cnn_lstm.load()
     cnn_lstm.train()
     cnn_lstm.predict()
