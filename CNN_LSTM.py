@@ -13,6 +13,7 @@ from tensorflow.keras.layers import BatchNormalization,LeakyReLU,Dense,LSTM,Drop
 import h5py
 import numpy as np
 import pandas as pd
+opt = [tf.keras.optimizers.Adam(),tf.keras.optimizers.SGD(momentum=0.2,nesterov=True)]
 
 class myCNN_LSTM:
     def __init__(self):
@@ -88,17 +89,17 @@ class myCNN_LSTM:
         if plot:
             pyplot.show()
 
-    def predict(self,path_x='X_train.h5'):
+    def predict(self,path_x='X_test.h5'):
         # load dataset
         h5_file = h5py.File(path_x,"r")
         test_X = (np.array(h5_file["data"][:, 2:])).astype('float32')
         test_X = test_X.reshape(test_X.shape[0],8,int(test_X.shape[1]/800),100)
-        test_X = test_X.reshape([X_train.shape[0],X_train.shape[1],-1,1])
+        test_X = test_X.transpose(0,2,3,1);test_X = (test_X-self.mean)/self.aplt
+        test_X = test_X.reshape([test_X.shape[0],test_X.shape[1],-1,1])
         test_y = self.model.predict(test_X)
         test_y = test_y.reshape(test_y.shape[0],test_y.shape[1])
-        pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("train/CRNN_y.csv")
-##        pd.DataFrame(test_y).to_csv("results/y_hat/CRNN_y_hat.csv")
-##        pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("results/test_y/CRNN_y.csv")
+        # pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("train/CRNN_y.csv")
+        pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("results/test_y/CRNN_y.csv")
 
     def save(self):
         """
@@ -108,6 +109,9 @@ class myCNN_LSTM:
         self.model.save('results/models/CRNN/cnn_lstm_.h5')
         np.save("results/models/CRNN/mean.npy",self.mean)
         np.save("results/models/CRNN/aplt.npy",self.aplt)
+
+    def config(self,i=1):
+        self.model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=opt[i])
 
     def load(self):
         """
@@ -122,5 +126,6 @@ class myCNN_LSTM:
 if __name__=="__main__":
     cnn_lstm=myCNN_LSTM()
     cnn_lstm.load()
-    cnn_lstm.train()
+####    cnn_lstm.config()
+####    cnn_lstm.train(epochs=150)
     cnn_lstm.predict()
