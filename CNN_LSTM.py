@@ -39,7 +39,7 @@ class myCNN_LSTM:
         if self.model==None:
             self.model = Sequential()
             # Convolution layer
-            self.model.add(Conv2D(16,[3,3], input_shape=(train_X.shape[-3],train_X.shape[-2], train_X.shape[-1]), padding='same', kernel_initializer='he_normal'))  # (None, ls, 38, 32)
+            self.model.add(Conv2D(16,[3,3], input_shape=(train_X.shape[-3:]), padding='same', kernel_initializer='he_normal'))  # (None, ls, 38, 32)
             self.model.add(AveragePooling2D([1,5],padding="same"))
             self.model.add(BatchNormalization(momentum=0.8))
             self.model.add(Conv2D(32, [3,3], padding='same', kernel_initializer='he_normal'))
@@ -47,7 +47,6 @@ class myCNN_LSTM:
             self.model.add(AveragePooling2D([1,5],padding="same"))
             self.model.add(Dropout(0.25))
             self.model.add(Reshape(target_shape=((90,-1))))
-            self.model.add(Dropout(0.25))
             # CNN to RNN
             self.model.add(LSTM(256, return_sequences=True))
             self.model.add(Dropout(0.3))

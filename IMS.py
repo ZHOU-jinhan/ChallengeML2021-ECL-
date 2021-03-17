@@ -118,16 +118,18 @@ class myIMS:
         # Test RMSE = 0.768
         print('Test RMSE: %.3f\n' % rmse)
 
-    def predict(self,path_x='X_test.h5'):
+    def predict(self,path_x='X_train.h5'):
         # load dataset
         h5_file = h5py.File(path_x,"r")
         test_X = (np.array(h5_file["data"][:, 2:])).astype('float32')
         print("Test : ")
-        test_X = test_X.reshape(test_X.shape[0],8,-1,4,25)
+        test_X = test_X.reshape(test_X.shape[0],8,-1,10,10)
         test_X = np.mean(test_X,axis=-1).transpose(0,2,3,1).reshape(-1,8)
         spli=5*900;l=int(np.ceil(test_X.shape[0]/spli))
+        print(test_X.shape,spli,l,spli*l)
         for i in range(l):
             t=time()
+            print(i*spli,(i+1)*spli)
             X=test_X[i*spli:(i+1)*spli,:]
             y = self.model.validate(X)
             y = (np.sum(y.reshape(-1,90,10),axis=2)==0).astype("int32")
@@ -136,7 +138,7 @@ class myIMS:
             except:
                 test_y=y.copy()
             print("\r\tProcess : "+str(round((i+1)/l*100,2))+"%-"+str(round(time()-t,2))+'s')
-        pd.DataFrame(test_y.astype("int32")).to_csv("results/test_y/IMS_y.csv")
+        pd.DataFrame(test_y.astype("int32")).to_csv("train/IMS_y.csv")
 
     def save(self):
         self.model.save()
@@ -147,5 +149,5 @@ class myIMS:
 
 if __name__ == "__main__":
     ims = myIMS()
-    ims.train()
+    ims.load()
     ims.predict()

@@ -1,14 +1,7 @@
-from math import sqrt
-from numpy import concatenate
 from matplotlib import pyplot
-from pandas import read_csv
-from pandas import DataFrame
-from pandas import concat
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_squared_error
 from tensorflow.keras.models import Sequential,load_model
-from tensorflow.keras.layers import BatchNormalization,Dense,LSTM,Dropout,Reshape,Permute
+from tensorflow.keras.layers import BatchNormalization,Dense,LSTM,Dropout,Reshape,Permute,AveragePooling1D
 import tensorflow as tf
 import h5py
 import numpy as np
@@ -22,12 +15,12 @@ class myLSTM:
         # load dataset
         h5_file=h5py.File(path_x,"r");X_data=(np.array(h5_file["data"][:, 2:])).astype('float32')
         print(X_data.shape)
-        X_train = X_data.reshape([X_data.shape[0],8,-1,100])
-        X_train = X_train.transpose(0,2,3,1);X=X_train.reshape([-1,X_train.shape[-1]]);
+        X_train = X_data.reshape(X_data.shape[0],8,-1,100)
+        X_train = X_train.transpose(0,2,3,1);X=X_train.reshape(-1,8);
         self.mean = np.mean(X,axis=0);self.aplt = np.max(X,axis=0)-np.min(X,axis=0)
         X_train = (X_train-self.mean)/self.aplt
-        X_train = X_train.transpose(0,3,1,2)
-        Y_train = read_csv(path_y, header=0, index_col=0).values.astype('float32')
+        X_train = X_train.reshape(X_train.shape[0],-1,20*8)
+        Y_train = pd.read_csv(path_y, header=0, index_col=0).values.astype('float32')
         # split into train and test sets
         n_train_hours = int(X_train.shape[0]*train_split)
         # split into input and outputs
@@ -42,15 +35,11 @@ class myLSTM:
         # design network
         if self.model==None:
             self.model = Sequential()
-            self.model.add(Dense(20,input_shape=X_train.shape[1:]))
-            self.model.add(BatchNormalization(momentum=0.5))
-            self.model.add(Reshape(target_shape=(8,-1)))
-            self.model.add(Permute((2,1)))
-            self.model.add(LSTM(80, return_sequences=True))
+            self.model.add(LSTM(20, return_sequences=True))
             self.model.add(Dropout(0.25))
-            self.model.add(Dense(1,activation="softmax"))
             self.model.add(Reshape(target_shape=(-1,)))
-            self.model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=2e-3))
+            self.model.add(Dense(90,activation="softmax"))
+            self.model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=0.3e-3))
         # fit network
         if train_split!=1:
             history = self.model.fit(train_X, train_y, epochs=epochs, batch_size=batch_size, validation_data=(test_X, test_y), verbose=2, shuffle=False)
@@ -77,22 +66,22 @@ class myLSTM:
             self.d_threshold=0.5*np.median(yhat[np.where(test_y==1)])\
                               +0.5*np.median(yhat[np.where(test_y==0)])
         # calculate RMSE
-        rmse = sqrt(mean_squared_error(test_y, yhat))
+        rmse = np.sqrt(mean_squared_error(test_y, yhat))
         print('Test RMSE: %.3f' % rmse)
-        rmse = sqrt(mean_squared_error(test_y, (yhat>self.d_threshold).astype("int32")))
+        rmse = np.sqrt(mean_squared_error(test_y, (yhat>self.d_threshold).astype("int32")))
         print('Test RMSE(0/1): %.3f' % rmse)
         self.save()
         if plot:
             pyplot.show()
 
-    def predict(self,path_x='X_train.h5'):
+    def predict(self,path_x='X_test.h5'):
         # load dataset
         h5_file = h5py.File(path_x,"r")
         test_X = (np.array(h5_file["data"][:, 2:])).astype('float32')
         test_X = test_X.reshape(test_X.shape[0],8,-1,100)
         test_X = test_X.transpose(0,2,3,1)
         test_X = (test_X-self.mean)/self.aplt
-        test_X = test_X.transpose(0,3,1,2)
+        test_X = test_X.reshape(test_X.shape[0],-1,20*8)
         test_y = self.model.predict(test_X)
         if path_x=="X_train.h5":
             pd.DataFrame((test_y>self.d_threshold).astype("int32")).to_csv("train/LSTM_y.csv")
@@ -120,6 +109,6 @@ class myLSTM:
 
 if __name__=="__main__":
     lstm=myLSTM()
-##    lstm.load()
-    lstm.train()
+    #lstm.load()
+    lstm.train(epochs=60)
     lstm.predict()
